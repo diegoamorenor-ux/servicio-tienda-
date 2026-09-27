@@ -1,0 +1,53 @@
+name: QA Cloud-Native CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      security_gate:
+        description: 'Activar Security Gate bloqueante (on/off)'
+        required: false
+        default: 'off'
+
+jobs:
+  build-and-test:
+    name: Build, Tests QA (186 aserciones) & Security Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: FASE INSTALL - Instalar dependencias
+        run: |
+          npm install
+
+      - name: FASE PRE_BUILD - Generar datos sinteticos con Faker
+        run: |
+          npm run generar
+          npm run seed
+
+      - name: FASE BUILD & POST_BUILD & SECURITY_GATE - Ejecutar Pipeline
+        env:
+          SECURITY_GATE: ${{ github.event.inputs.security_gate || 'off' }}
+        run: |
+          npm run pipeline
+
+      - name: Subir artefactos de reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-qa-seguridad
+          path: |
+            4-pipeline/test-report.json
+            5-inspector/resumen-analisis.json
+          if-no-files-found: ignore
